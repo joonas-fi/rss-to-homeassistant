@@ -23,6 +23,7 @@
 				"dev": ["bash"]
 			},
 			"pass_envs": [
+				"EVENTHORIZON",
 				"GITHUB_TOKEN"
 			]
 		}
