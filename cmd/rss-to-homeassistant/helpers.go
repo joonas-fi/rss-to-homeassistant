@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/function61/gokit/crypto/cryptoutil"
 )
 
 func launch(ctx context.Context, fn func(ctx context.Context) error) <-chan error {
@@ -43,6 +40,14 @@ func launchAndWaitMany(
 	return firstError
 }
 
-func cacheBust(url string) string {
-	return fmt.Sprintf("%s?cachebust=%s", url, cryptoutil.RandBase64Url(4))
+type valueChangeDetector struct {
+	previousValue string
+}
+
+func (v *valueChangeDetector) Changed(value string) bool {
+	different := v.previousValue != value
+
+	v.previousValue = value
+
+	return different
 }

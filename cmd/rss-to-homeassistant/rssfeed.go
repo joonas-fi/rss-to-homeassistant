@@ -25,6 +25,7 @@ func makeRssFeedSensor(
 		homeassistant.DeviceClassDefault,
 		true)
 
+	// TODO: we could use HTTP caching mechanism here
 	rssChangeDetector := &valueChangeDetector{}
 
 	return sensor, func(ctx context.Context) error {
