@@ -65,8 +65,8 @@ entity's Markdown content:
 You're done!
 
 
-Keep this running between across computer restarts
---------------------------------------------------
+Keep this running across system restarts
+----------------------------------------
 
 If you're on Linux, we have a helper to integrate with systemd:
 
