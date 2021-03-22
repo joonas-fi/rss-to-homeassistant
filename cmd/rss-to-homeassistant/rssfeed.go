@@ -12,6 +12,8 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
+// makes sensor entity for advertising via autodiscovery, and a re-runnable task that checks for
+// changes in the feed, and if it has it publishes the changed markdown to Home Assistant
 func makeRssFeedSensor(
 	entityId string,
 	feedUrl string,
@@ -29,12 +31,12 @@ func makeRssFeedSensor(
 	rssChangeDetector := &valueChangeDetector{}
 
 	return sensor, func(ctx context.Context) error {
-		feed, err := getFeedItems(ctx, feedUrl)
+		feed, err := fetchRSSFeedItems(ctx, feedUrl)
 		if err != nil {
 			return err
 		}
 
-		feedAsMarkdown := feedToMarkdown(feed, 8, 100)
+		feedAsMarkdown := feedToMarkdownList(feed, 8, 100)
 
 		if !rssChangeDetector.Changed(feedAsMarkdown) {
 			return nil
@@ -49,15 +51,14 @@ func makeRssFeedSensor(
 	}
 }
 
-// renders a Markdown table from feed items
-func feedToMarkdown(feed *gofeed.Feed, maxItems int, truncate int) string {
+func feedToMarkdownList(feed *gofeed.Feed, maxItems int, maxLineLength int) string {
 	lines := []string{}
 	line := func(l string) {
 		lines = append(lines, l)
 	}
 
 	for _, item := range feed.Items {
-		line(fmt.Sprintf("- [%s](%s)", stringutils.Truncate(item.Title, truncate), item.Link))
+		line(fmt.Sprintf("- [%s](%s)", stringutils.Truncate(item.Title, maxLineLength), item.Link))
 
 		if len(lines) >= maxItems {
 			break
@@ -67,7 +68,7 @@ func feedToMarkdown(feed *gofeed.Feed, maxItems int, truncate int) string {
 	return strings.Join(lines, "\n")
 }
 
-func getFeedItems(ctx context.Context, feedUrl string) (*gofeed.Feed, error) {
+func fetchRSSFeedItems(ctx context.Context, feedUrl string) (*gofeed.Feed, error) {
 	res, err := ezhttp.Get(ctx, feedUrl)
 	if err != nil {
 		return nil, err
