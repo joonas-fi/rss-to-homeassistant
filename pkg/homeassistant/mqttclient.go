@@ -1,10 +1,8 @@
 package homeassistant
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/function61/gokit/log/logex"
 	"github.com/yosssi/gmq/mqtt"
@@ -24,7 +22,6 @@ type MqttClient struct {
 
 func NewMqttClient(
 	mqttAddr string,
-	start func(task func(context.Context) error),
 	logl *logex.Leveled,
 ) (*MqttClient, error) {
 	mqttClient := client.New(&client.Options{
@@ -41,69 +38,14 @@ func NewMqttClient(
 		return nil, err
 	}
 
-	ha := &MqttClient{
+	return &MqttClient{
 		mqtt: mqttClient,
 		logl: logl,
-	}
-
-	// worker (doesn't do anything yet)
-	start(nil)
-	/*
-		start(func(ctx context.Context) error {
-			<-ctx.Done()
-			return nil
-		})
-	*/
-
-	return ha, nil
-}
-
-func (h *MqttClient) SubscribeForStateChanges() (<-chan InboundCommand, error) {
-	inboundCh := make(chan InboundCommand, 1)
-
-	if err := h.mqtt.Subscribe(&client.SubscribeOptions{
-		SubReqs: []*client.SubReq{
-			{
-				TopicFilter: []byte("homeassistant/+/hautomo/+/set"),
-				QoS:         mqtt.QoS0,
-				Handler: func(topicName, message []byte) {
-					components := strings.Split(string(topicName), "/")
-					if len(components) != 5 {
-						h.logl.Error.Printf("invalid topic name: %s", topicName)
-						return
-					}
-
-					entityId := components[3]
-
-					inboundCh <- InboundCommand{
-						EntityId: entityId,
-						State:    string(message),
-					}
-				},
-			},
-		},
-	}); err != nil {
-		return nil, err
-	}
-
-	return inboundCh, nil
+	}, nil
 }
 
 func (h *MqttClient) Close() error {
 	h.mqtt.Terminate()
-	return nil
-}
-
-func (h *MqttClient) PublishState(sensor *Entity, state string) error {
-	if err := h.mqtt.Publish(&client.PublishOptions{
-		QoS:       mqtt.QoS0,
-		Retain:    false,
-		TopicName: []byte(sensor.mqttStateTopic()),
-		Message:   []byte(state),
-	}); err != nil {
-		return fmt.Errorf("PublishState: %w", err)
-	}
-
 	return nil
 }
 

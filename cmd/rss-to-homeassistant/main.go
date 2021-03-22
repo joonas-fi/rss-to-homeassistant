@@ -69,12 +69,7 @@ func logic(ctx context.Context, logger *log.Logger) error {
 
 	logl := logex.Levels(logger)
 
-	ha, err := homeassistant.NewMqttClient(conf.MqttAddr, func(task func(context.Context) error) {
-		if task != nil {
-			panic("not implemented")
-		}
-		// do nothing
-	}, logl)
+	ha, err := homeassistant.NewMqttClient(conf.MqttAddr, logl)
 	if err != nil {
 		return fmt.Errorf("NewMqttClient: %w", err)
 	}
