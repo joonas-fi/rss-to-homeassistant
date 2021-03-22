@@ -83,5 +83,5 @@ Verify successful start:
 TODO
 ----
 
-Some of the code was hurrily extracted from [Hautomo](https://github.com/function61/hautomo), so it
+Some of the code was hurriedly extracted from [Hautomo](https://github.com/function61/hautomo), so it
 might not make sense. Needs minor cleanups.
