@@ -46,7 +46,8 @@ func makeRssFeedSensor(
 
 		// need to store content as an attribute, because state is capped at 256 chars
 		return ha.PublishAttributes(sensor, map[string]string{
-			"md": feedAsMarkdown,
+			"title": feed.Title, // in case user wants to display the title dynamically from the feed
+			"md":    feedAsMarkdown,
 		})
 	}
 }
