@@ -4,9 +4,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/function61/gokit/app/dynversion"
@@ -125,6 +127,14 @@ func readConfigurationFile() (*config, error) {
 	conf := &config{}
 	if err := jsonfile.ReadDisallowUnknownFields("config.json", &conf); err != nil {
 		return nil, err
+	}
+
+	for _, rssFeed := range conf.RSSFeeds {
+		// Home Assistant tolerates this but will silently translate to '_'.
+		// but we want to be explicit to avoid confusion.
+		if strings.Contains(rssFeed.Id, "-") {
+			return nil, errors.New("RSS feed ID cannot contain '-'")
+		}
 	}
 
 	return conf, nil
