@@ -69,7 +69,7 @@ func logic(ctx context.Context, logger *log.Logger) error {
 
 	logl := logex.Levels(logger)
 
-	ha, err := homeassistant.NewMqttClient(conf.MqttAddr, logl)
+	ha, err := homeassistant.NewMqttClient(conf.MQTTAddr, logl)
 	if err != nil {
 		return fmt.Errorf("NewMqttClient: %w", err)
 	}
@@ -78,8 +78,8 @@ func logic(ctx context.Context, logger *log.Logger) error {
 
 	allEntities := []*homeassistant.Entity{}
 
-	for _, feed := range conf.RssFeeds {
-		feedSensor, feedPollerTask := makeRssFeedSensor(feed.Id, feed.Url, ha, logl)
+	for _, feed := range conf.RSSFeeds {
+		feedSensor, feedPollerTask := makeRssFeedSensor(feed.Id, feed.URL, ha, logl)
 
 		allEntities = append(allEntities, feedSensor)
 		pollingTasks = append(pollingTasks, feedPollerTask)
@@ -111,17 +111,21 @@ func logic(ctx context.Context, logger *log.Logger) error {
 	}
 }
 
-type configRssFeed struct {
+type configRSSFeed struct {
 	Id  string `json:"id"`
-	Url string `json:"url"`
+	URL string `json:"url"`
 }
 
 type config struct {
-	MqttAddr string          `json:"mqtt_addr"`
-	RssFeeds []configRssFeed `json:"rss_feeds"`
+	MQTTAddr string          `json:"mqtt_addr"`
+	RSSFeeds []configRSSFeed `json:"rss_feeds"`
 }
 
 func readConfigurationFile() (*config, error) {
 	conf := &config{}
-	return conf, jsonfile.ReadDisallowUnknownFields("config.json", &conf)
+	if err := jsonfile.ReadDisallowUnknownFields("config.json", &conf); err != nil {
+		return nil, err
+	}
+
+	return conf, nil
 }
