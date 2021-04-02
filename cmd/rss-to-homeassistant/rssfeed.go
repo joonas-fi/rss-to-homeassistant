@@ -15,15 +15,14 @@ import (
 // makes sensor entity for advertising via autodiscovery, and a re-runnable task that checks for
 // changes in the feed, and if it has it publishes the changed markdown to Home Assistant
 func makeRssFeedSensor(
-	entityId string,
-	feedUrl string,
+	feedConfig configRSSFeed,
 	ha *homeassistant.MqttClient,
 	logl *logex.Leveled,
 ) (*homeassistant.Entity, func(context.Context) error) {
 	// need attribute topic, see comment later
 	sensor := homeassistant.NewSensor(
-		entityId,
-		feedUrl,
+		feedConfig.Id,
+		feedConfig.URL,
 		homeassistant.DeviceClassDefault,
 		true)
 
@@ -31,18 +30,26 @@ func makeRssFeedSensor(
 	rssChangeDetector := &valueChangeDetector{}
 
 	return sensor, func(ctx context.Context) error {
-		feed, err := fetchRSSFeedItems(ctx, feedUrl)
+		feed, err := fetchRSSFeedItems(ctx, feedConfig.URL)
 		if err != nil {
 			return err
 		}
 
-		feedAsMarkdown := feedToMarkdownList(feed, 8, 100)
+		itemDisplayLimit := func() int {
+			if feedConfig.Settings != nil {
+				return feedConfig.Settings.ItemDisplayLimit
+			} else {
+				return 8
+			}
+		}()
+
+		feedAsMarkdown := feedToMarkdownList(feed, itemDisplayLimit, 100)
 
 		if !rssChangeDetector.Changed(feedAsMarkdown) {
 			return nil
 		}
 
-		logl.Info.Printf("%s changed", entityId)
+		logl.Info.Printf("%s changed", feedConfig.Id)
 
 		// need to store content as an attribute, because state is capped at 256 chars
 		return ha.PublishAttributes(sensor, map[string]string{

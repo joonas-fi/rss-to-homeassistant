@@ -81,7 +81,7 @@ func logic(ctx context.Context, logger *log.Logger) error {
 	allEntities := []*homeassistant.Entity{}
 
 	for _, feed := range conf.RSSFeeds {
-		feedSensor, feedPollerTask := makeRssFeedSensor(feed.Id, feed.URL, ha, logl)
+		feedSensor, feedPollerTask := makeRssFeedSensor(feed, ha, logl)
 
 		allEntities = append(allEntities, feedSensor)
 		pollingTasks = append(pollingTasks, feedPollerTask)
@@ -114,8 +114,13 @@ func logic(ctx context.Context, logger *log.Logger) error {
 }
 
 type configRSSFeed struct {
-	Id  string `json:"id"`
-	URL string `json:"url"`
+	Id       string        `json:"id"`
+	URL      string        `json:"url"`
+	Settings *feedSettings `json:"settings"`
+}
+
+type feedSettings struct {
+	ItemDisplayLimit int `json:"item_display_limit"`
 }
 
 type config struct {
