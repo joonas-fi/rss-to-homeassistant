@@ -92,14 +92,27 @@ func logic(ctx context.Context, logger *log.Logger) error {
 		return err
 	}
 
-	runPollingTasks := func() {
-		_ = launchAndWaitMany(ctx, func(err error) {
+	// error return (instead of logging and returning nil) signifies fatal error that should result in exit
+	runPollingTasks := func() error {
+		if err := launchAndWaitMany(ctx, func(err error) {
 			logl.Error.Println(err)
-		}, pollingTasks...)
+		}, pollingTasks...); err != nil {
+			// we don't support MQTT reconnects (yet), so if that happened "crash" the service to
+			// let our supervisor (usually Systemd) restart us again
+			if wasMQTTConnectionError(err) {
+				return err // fatal error
+			} else {
+				return nil // non-fatal error (was already logged above)
+			}
+		}
+
+		return nil
 	}
 
 	// so we don't have to wait the *pollInterval* for the initial sync
-	runPollingTasks()
+	if err := runPollingTasks(); err != nil {
+		return err
+	}
 
 	pollInterval := time.NewTicker(1 * time.Minute)
 
@@ -108,7 +121,9 @@ func logic(ctx context.Context, logger *log.Logger) error {
 		case <-ctx.Done():
 			return nil
 		case <-pollInterval.C:
-			runPollingTasks()
+			if err := runPollingTasks(); err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -143,4 +158,9 @@ func readConfigurationFile() (*config, error) {
 	}
 
 	return conf, nil
+}
+
+func wasMQTTConnectionError(err error) bool {
+	// yes, I am ashamed of this check...
+	return strings.Contains(err.Error(), "the Client has not yet connected to the Server")
 }
