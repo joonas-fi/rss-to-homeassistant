@@ -16,3 +16,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         EVENTHORIZON: ${{ secrets.EVENTHORIZON }}
+    - uses: actions/upload-artifact@v2
+      with:
+        path: rel/
