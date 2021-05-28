@@ -18,4 +18,4 @@ jobs:
         EVENTHORIZON: ${{ secrets.EVENTHORIZON }}
     - uses: actions/upload-artifact@v2
       with:
-        path: rel/*
+        path: rel/
