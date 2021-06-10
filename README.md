@@ -9,11 +9,9 @@ For more background, see my [blog post](https://joonas.fi/2020/08/displaying-rss
 Prerequisites
 -------------
 
-You need:
-
 - Home Assistant
 - Home Assistant needs to be connected to a MQTT server
-- Download & run this software, `rss-to-homeassistant`
+- This software
 
 
 Configuration
@@ -23,7 +21,7 @@ You need to create `config.json`:
 
 ```json
 {
-	"mqtt_addr": "192.168.1.3:1883",
+	"mqtt_addr": "127.0.0.1:1883",
 	"rss_feeds": [
 		{
 			"id": "skrolli",
@@ -37,14 +35,30 @@ You need to create `config.json`:
 How to use
 ----------
 
-You've created the configuration file.
+You can run this on any computer as long as it can connect to the same MQTT server that Home Assistant uses.
 
-Now after starting, if everything goes well, you should see this message:
+For example, make a directory `/home/<username>/rss-to-homeassistant`.
+
+Download a suitable binary there (for Raspberry Pi, use the ARM build, for PCs use the amd64 build).
+
+You can rename the downloaded binary to `rss-to-homeassistant`.
+
+You've created the configuration file. The directory has these contents:
+
+```
+/home/pi/rss-to-homeassistant
+├── config.json
+└── rss-to-homeassistant
+```
+
+Test starting it manually. If everything goes well, you should see this message:
 
 ```console
 $ ./rss-to-homeassistant
 2021/03/22 07:45:30 [INFO] skrolli changed
 ```
+
+You can stop it with `Ctrl + c`.
 
 The RSS feed should've just popped into Home Assistant (because we use its
 [autodiscovery](https://www.home-assistant.io/docs/mqtt/discovery/) mechanism to advertise the feeds):
@@ -78,6 +92,9 @@ Run to enable on boot & to start (--)now:
 Verify successful start:
 	$ systemctl status rss-to-homeassistant
 ```
+
+If you followed the tips the installer gave, this program should automatically start after restarts.
+Have fun! Enjoy life.
 
 
 TODO
