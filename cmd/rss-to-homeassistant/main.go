@@ -100,7 +100,7 @@ func logic(ctx context.Context, logger *log.Logger) error {
 
 		// error return (instead of logging and returning nil) signifies fatal error that should result in exit
 		runPollingTasks := func() {
-			launchAndWaitMany(ctx, func(err error) {
+			_ = launchAndWaitMany(ctx, func(err error) {
 				logl.Error.Println(err)
 			}, pollingTasks...)
 		}
