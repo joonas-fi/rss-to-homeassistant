@@ -16,7 +16,8 @@ import (
 	"github.com/function61/gokit/log/logex"
 	"github.com/function61/gokit/os/osutil"
 	"github.com/function61/gokit/os/systemdinstaller"
-	"github.com/joonas-fi/rss-to-homeassistant/pkg/homeassistant"
+	"github.com/function61/gokit/sync/taskrunner"
+	"github.com/function61/hautomo/pkg/homeassistant"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +65,11 @@ func main() {
 }
 
 func logic(ctx context.Context, logger *log.Logger) error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
 	conf, err := readConfigurationFile()
 	if err != nil {
 		return err
@@ -71,61 +77,50 @@ func logic(ctx context.Context, logger *log.Logger) error {
 
 	logl := logex.Levels(logger)
 
-	ha, err := homeassistant.NewMqttClient(conf.MQTTAddr, logl)
-	if err != nil {
-		return fmt.Errorf("NewMqttClient: %w", err)
-	}
+	ha, haMqttTask := homeassistant.NewMqttClient(conf.MQTTAddr, "rss-to-homeassistant-"+hostname, logl)
 
-	pollingTasks := []func(context.Context) error{}
+	tasks := taskrunner.New(ctx, logger)
+	tasks.Start("homeassistant-mqtt", haMqttTask)
+	tasks.Start("main", func(ctx context.Context) error {
+		pollingTasks := []func(context.Context) error{}
 
-	allEntities := []*homeassistant.Entity{}
+		entities := []*homeassistant.Entity{}
 
-	for _, feed := range conf.RSSFeeds {
-		feedSensor, feedPollerTask := makeRssFeedSensor(feed, ha, logl)
+		for _, feed := range conf.RSSFeeds {
+			feedSensor, feedPollerTask := makeRssFeedSensor(feed, ha, logl)
 
-		allEntities = append(allEntities, feedSensor)
-		pollingTasks = append(pollingTasks, feedPollerTask)
-	}
-
-	// tell Home Assistant about our sensor entities
-	if err := ha.AutodiscoverEntities(allEntities...); err != nil {
-		return err
-	}
-
-	// error return (instead of logging and returning nil) signifies fatal error that should result in exit
-	runPollingTasks := func() error {
-		if err := launchAndWaitMany(ctx, func(err error) {
-			logl.Error.Println(err)
-		}, pollingTasks...); err != nil {
-			// we don't support MQTT reconnects (yet), so if that happened "crash" the service to
-			// let our supervisor (usually Systemd) restart us again
-			if wasMQTTConnectionError(err) {
-				return err // fatal error
-			} else {
-				return nil // non-fatal error (was already logged above)
-			}
+			entities = append(entities, feedSensor)
+			pollingTasks = append(pollingTasks, feedPollerTask)
 		}
 
-		return nil
-	}
+		// tell Home Assistant about our sensor entities
+		if err := ha.AutodiscoverEntities(entities...); err != nil {
+			return err
+		}
 
-	// so we don't have to wait the *pollInterval* for the initial sync
-	if err := runPollingTasks(); err != nil {
-		return err
-	}
+		// error return (instead of logging and returning nil) signifies fatal error that should result in exit
+		runPollingTasks := func() {
+			launchAndWaitMany(ctx, func(err error) {
+				logl.Error.Println(err)
+			}, pollingTasks...)
+		}
 
-	pollInterval := time.NewTicker(1 * time.Minute)
+		// so we don't have to wait the *pollInterval* for the initial sync
+		runPollingTasks()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-pollInterval.C:
-			if err := runPollingTasks(); err != nil {
-				return err
+		pollInterval := time.NewTicker(1 * time.Minute)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-pollInterval.C:
+				runPollingTasks()
 			}
 		}
-	}
+	})
+
+	return tasks.Wait()
 }
 
 type configRSSFeed struct {
@@ -158,9 +153,4 @@ func readConfigurationFile() (*config, error) {
 	}
 
 	return conf, nil
-}
-
-func wasMQTTConnectionError(err error) bool {
-	// yes, I am ashamed of this check...
-	return strings.Contains(err.Error(), "the Client has not yet connected to the Server")
 }

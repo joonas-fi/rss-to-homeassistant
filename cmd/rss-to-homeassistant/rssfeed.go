@@ -8,9 +8,12 @@ import (
 	"github.com/function61/gokit/log/logex"
 	"github.com/function61/gokit/net/http/ezhttp"
 	"github.com/function61/gokit/strings/stringutils"
-	"github.com/joonas-fi/rss-to-homeassistant/pkg/homeassistant"
+	"github.com/function61/hautomo/pkg/changedetector"
+	"github.com/function61/hautomo/pkg/homeassistant"
 	"github.com/mmcdole/gofeed"
 )
+
+var topicPrefix = homeassistant.NewTopicPrefix("rss-to-homeassistant")
 
 // makes sensor entity for advertising via autodiscovery, and a re-runnable task that checks for
 // changes in the feed, and if it has it publishes the changed markdown to Home Assistant
@@ -20,17 +23,20 @@ func makeRssFeedSensor(
 	logl *logex.Leveled,
 ) (*homeassistant.Entity, func(context.Context) error) {
 	// need attribute topic, see comment later
-	sensor := homeassistant.NewSensor(
+	sensor := homeassistant.NewSensorEntity(
 		feedConfig.Id,
-		feedConfig.URL,
-		homeassistant.DeviceClassDefault,
-		true)
+		"rss_"+feedConfig.Id,
+		homeassistant.DiscoveryOptions{
+			UniqueId:            "rss-" + feedConfig.Id,
+			StateTopic:          topicPrefix.StateTopic(feedConfig.Id), // we don't use state, but this is required
+			JsonAttributesTopic: topicPrefix.AttributesTopic(feedConfig.Id),
+		})
 
 	// TODO: we could use HTTP caching mechanism here
-	rssChangeDetector := &valueChangeDetector{}
+	rssChangeDetector := changedetector.New()
 
 	return sensor, func(ctx context.Context) error {
-		feed, err := fetchRSSFeedItems(ctx, feedConfig.URL)
+		feed, err := fetchRSSFeed(ctx, feedConfig.URL)
 		if err != nil {
 			return err
 		}
@@ -45,16 +51,22 @@ func makeRssFeedSensor(
 
 		feedAsMarkdown := feedToMarkdownList(feed, itemDisplayLimit, 100)
 
-		if !rssChangeDetector.Changed(feedAsMarkdown) {
+		changed, err := rssChangeDetector.ReaderChanged(strings.NewReader(feedAsMarkdown))
+		if err != nil {
+			return err
+		}
+
+		if !changed {
 			return nil
 		}
 
 		logl.Info.Printf("%s changed", feedConfig.Id)
 
 		// need to store content as an attribute, because state is capped at 256 chars
-		return ha.PublishAttributes(sensor, map[string]string{
+		return <-ha.PublishAttributes(sensor, map[string]interface{}{
 			"title": feed.Title, // in case user wants to display the title dynamically from the feed
 			"md":    feedAsMarkdown,
+			"url":   feedConfig.URL,
 		})
 	}
 }
@@ -76,7 +88,7 @@ func feedToMarkdownList(feed *gofeed.Feed, maxItems int, maxLineLength int) stri
 	return strings.Join(lines, "\n")
 }
 
-func fetchRSSFeedItems(ctx context.Context, feedUrl string) (*gofeed.Feed, error) {
+func fetchRSSFeed(ctx context.Context, feedUrl string) (*gofeed.Feed, error) {
 	res, err := ezhttp.Get(ctx, feedUrl)
 	if err != nil {
 		return nil, err

@@ -39,15 +39,3 @@ func launchAndWaitMany(
 
 	return firstError
 }
-
-type valueChangeDetector struct {
-	previousValue string
-}
-
-func (v *valueChangeDetector) Changed(value string) bool {
-	different := v.previousValue != value
-
-	v.previousValue = value
-
-	return different
-}
