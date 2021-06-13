@@ -37,6 +37,8 @@ You need to create `config.json`:
 }
 ```
 
+If you don't use MQTT username/password, you can remove the whole `"credentials": {...}` section.
+
 
 How to use
 ----------
