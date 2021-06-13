@@ -77,7 +77,7 @@ func logic(ctx context.Context, logger *log.Logger) error {
 
 	logl := logex.Levels(logger)
 
-	ha, haMqttTask := homeassistant.NewMqttClient(conf.MQTTAddr, "rss-to-homeassistant-"+hostname, logl)
+	ha, haMqttTask := homeassistant.NewMQTTClient(conf.MQTT, "rss-to-homeassistant-"+hostname, logl)
 
 	tasks := taskrunner.New(ctx, logger)
 	tasks.Start("homeassistant-mqtt", haMqttTask)
@@ -134,8 +134,8 @@ type feedSettings struct {
 }
 
 type config struct {
-	MQTTAddr string          `json:"mqtt_addr"`
-	RSSFeeds []configRSSFeed `json:"rss_feeds"`
+	MQTT     homeassistant.MQTTConfig `json:"mqtt"`
+	RSSFeeds []configRSSFeed          `json:"rss_feeds"`
 }
 
 func readConfigurationFile() (*config, error) {

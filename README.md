@@ -21,7 +21,13 @@ You need to create `config.json`:
 
 ```json
 {
-	"mqtt_addr": "127.0.0.1:1883",
+	"mqtt": {
+		"address": "127.0.0.1:1883",
+		"credentials": {
+			"username": "AzureDiamond",
+			"password": "hunter2"
+		}
+	},
 	"rss_feeds": [
 		{
 			"id": "skrolli",

@@ -65,6 +65,8 @@ github.com/function61/gokit v0.0.0-20210402130425-341c2c9ecfd0 h1:luHjU8QGQRC/LH
 github.com/function61/gokit v0.0.0-20210402130425-341c2c9ecfd0/go.mod h1:zoPwlTF/LeWbdcLYJbaZdHiXAbhhQnaDP336tJ4uG3o=
 github.com/function61/hautomo v0.0.0-20210611101311-5d7695052266 h1:yX07SERt+ZrHaR/Q3ouB7eR+Nyw6Yt124hZ8euAgSfI=
 github.com/function61/hautomo v0.0.0-20210611101311-5d7695052266/go.mod h1:tMvaQ/KSmCpYukeLGnBJYjKvhrgC9SDaP4UFCgXpOg0=
+github.com/function61/hautomo v0.0.0-20210613092052-f8c32d9ce472 h1:16mWtyIlsX64CIjdntrPKTgOZtpaNPvfg8ZwIV4POKU=
+github.com/function61/hautomo v0.0.0-20210613092052-f8c32d9ce472/go.mod h1:tMvaQ/KSmCpYukeLGnBJYjKvhrgC9SDaP4UFCgXpOg0=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
