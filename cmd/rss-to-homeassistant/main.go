@@ -93,12 +93,11 @@ func logic(ctx context.Context, logger *log.Logger) error {
 			pollingTasks = append(pollingTasks, feedPollerTask)
 		}
 
-		// tell Home Assistant about our sensor entities
+		// tell Home Assistant about our RSS feeds
 		if err := ha.AutodiscoverEntities(entities...); err != nil {
 			return err
 		}
 
-		// error return (instead of logging and returning nil) signifies fatal error that should result in exit
 		runPollingTasks := func() {
 			_ = launchAndWaitMany(ctx, func(err error) {
 				logl.Error.Println(err)

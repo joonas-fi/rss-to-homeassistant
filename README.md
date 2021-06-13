@@ -106,7 +106,5 @@ Have fun! Enjoy life.
 TODO
 ----
 
-- Some of the code was hurriedly extracted from [Hautomo](https://github.com/function61/hautomo), so it
-  might not make sense. Needs minor cleanups.
 - Consider polling interval, 1 minute might be too often
 - Implement HTTP caching to be nice to RSS publishers
