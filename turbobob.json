@@ -6,9 +6,9 @@
 	"builders": [
 		{
 			"name": "default",
-			"uses": "docker://fn61/buildkit-golang:20210208_0951_8496e47f",
+			"uses": "docker://fn61/buildkit-golang:20240405_0714_856c11bd",
 			"commands": {
-				"build": ["bin/build.sh"],
+				"build": ["build-go-project.sh", "--directory=cmd/rss-to-homeassistant/", "--binary-basename=rss-to-homeassistant"],
 				"dev": ["bash"]
 			},
 			"mount_destination": "/workspace",

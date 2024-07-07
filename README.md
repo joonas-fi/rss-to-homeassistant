@@ -1,3 +1,5 @@
+⬆️ For table of contents, click the above icon
+
 ![Build status](https://github.com/joonas-fi/rss-to-homeassistant/workflows/Build/badge.svg)
 [![Download](https://img.shields.io/github/downloads/joonas-fi/rss-to-homeassistant/total.svg?style=for-the-badge)](https://github.com/joonas-fi/rss-to-homeassistant/releases)
 
@@ -101,7 +103,7 @@ Verify successful start:
 	$ systemctl status rss-to-homeassistant
 ```
 
-If you followed the tips the installer gave, this program should automatically start after restarts.
+If you followed the tips the installer gave, this program should automatically start after reboots.
 Have fun! Enjoy life.
 
 
