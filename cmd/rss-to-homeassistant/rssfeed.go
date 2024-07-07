@@ -36,9 +36,11 @@ func makeRssFeedSensor(
 	rssChangeDetector := changedetector.New()
 
 	return sensor, func(ctx context.Context) error {
+		withErr := func(err error) error { return fmt.Errorf("%s: %w", feedConfig.Id, err) }
+
 		feed, err := fetchRSSFeed(ctx, feedConfig.URL)
 		if err != nil {
-			return err
+			return withErr(err)
 		}
 
 		itemDisplayLimit := func() int {
@@ -53,7 +55,7 @@ func makeRssFeedSensor(
 
 		changed, err := rssChangeDetector.ReaderChanged(strings.NewReader(feedAsMarkdown))
 		if err != nil {
-			return err
+			return withErr(err)
 		}
 
 		if !changed {
@@ -63,11 +65,15 @@ func makeRssFeedSensor(
 		logl.Info.Printf("%s changed", feedConfig.Id)
 
 		// need to store content as an attribute, because state is capped at 256 chars
-		return <-ha.PublishAttributes(sensor, map[string]interface{}{
+		if err := <-ha.PublishAttributes(sensor, map[string]interface{}{
 			"title": feed.Title, // in case user wants to display the title dynamically from the feed
 			"md":    feedAsMarkdown,
 			"url":   feedConfig.URL,
-		})
+		}); err != nil {
+			return withErr(err)
+		}
+
+		return nil
 	}
 }
 
