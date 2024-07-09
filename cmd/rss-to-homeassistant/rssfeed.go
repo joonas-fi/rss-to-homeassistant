@@ -38,20 +38,10 @@ func makeRssFeedSensor(
 	return sensor, func(ctx context.Context) error {
 		withErr := func(err error) error { return fmt.Errorf("%s: %w", feedConfig.Id, err) }
 
-		feed, err := fetchRSSFeed(ctx, feedConfig.URL)
+		feed, feedAsMarkdown, err := fetchRSSFeedToMarkdown(ctx, feedConfig)
 		if err != nil {
 			return withErr(err)
 		}
-
-		itemDisplayLimit := func() int {
-			if feedConfig.Settings != nil {
-				return feedConfig.Settings.ItemDisplayLimit
-			} else {
-				return 8
-			}
-		}()
-
-		feedAsMarkdown := feedToMarkdownList(feed, itemDisplayLimit, 100)
 
 		changed, err := rssChangeDetector.ReaderChanged(strings.NewReader(feedAsMarkdown))
 		if err != nil {
@@ -102,4 +92,21 @@ func fetchRSSFeed(ctx context.Context, feedUrl string) (*gofeed.Feed, error) {
 	defer res.Body.Close()
 
 	return gofeed.NewParser().Parse(res.Body)
+}
+
+func fetchRSSFeedToMarkdown(ctx context.Context, feedConfig configRSSFeed) (*gofeed.Feed, string, error) {
+	feed, err := fetchRSSFeed(ctx, feedConfig.URL)
+	if err != nil {
+		return nil, "", err
+	}
+
+	itemDisplayLimit := func() int {
+		if feedConfig.Settings != nil {
+			return feedConfig.Settings.ItemDisplayLimit
+		} else {
+			return 8
+		}
+	}()
+
+	return feed, feedToMarkdownList(feed, itemDisplayLimit, 100), nil
 }

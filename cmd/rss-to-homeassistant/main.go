@@ -61,6 +61,25 @@ func main() {
 		},
 	})
 
+	app.AddCommand(&cobra.Command{
+		Use:   "debug [feedURL]",
+		Short: "If a feed URL is not producing content, debug why",
+		Args:  cobra.ExactArgs(1),
+		Run: func(_ *cobra.Command, args []string) {
+			osutil.ExitIfError(func() error {
+				feedURL := args[0]
+
+				_, output, err := fetchRSSFeedToMarkdown(context.Background(), configRSSFeed{URL: feedURL})
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(output)
+				return nil
+			}())
+		},
+	})
+
 	osutil.ExitIfError(app.Execute())
 }
 
