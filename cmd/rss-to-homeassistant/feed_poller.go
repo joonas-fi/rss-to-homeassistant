@@ -48,10 +48,6 @@ func newFeedPoller(
 
 // start begins polling the feed at the configured interval with resilience features
 func (p *feedPoller) start(ctx context.Context) {
-	// Create a context for this poller instance
-	pollerCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Ensure we recover from any panics in the poller goroutine
 	defer func() {
 		if r := recover(); r != nil {
