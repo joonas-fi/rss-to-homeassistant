@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"math"
 	"sync/atomic"
 	"time"
 
@@ -73,7 +71,7 @@ func (p *feedPoller) start(ctx context.Context) {
 			return
 		case <-time.After(interval):
 			if p.isCircuitOpen() {
-				p.log.Warn.Printf("Circuit open for feed %s, waiting to retry...", p.feedConfig.Id)
+				p.log.Error.Printf("Circuit open for feed %s, waiting to retry...", p.feedConfig.Id)
 				time.Sleep(backoff)
 				// Exponential backoff with jitter
 				backoff = time.Duration(float64(backoff) * backoffMultiplier)
