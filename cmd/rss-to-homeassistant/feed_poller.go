@@ -134,4 +134,12 @@ func (p *feedPoller) resetCircuit() {
 
 // pollOnce performs a single poll of the feed with context timeout
 // This is kept for future use if direct polling is needed
-var _ = (*feedPoller).pollOnce
+/*
+func (p *feedPoller) pollOnce(ctx context.Context) error {
+	// Add a timeout to the poll operation
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	return p.pollFunc(ctx)
+}
+*/
