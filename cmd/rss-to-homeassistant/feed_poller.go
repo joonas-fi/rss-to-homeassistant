@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/function61/gokit/log/logex"
@@ -25,7 +25,8 @@ type feedPoller struct {
 	log        *logex.Leveled
 	pollFunc   func(context.Context) error
 
-	// Circuit breaker state
+	// Circuit breaker state - protected by mutex for thread safety
+	mu           sync.Mutex
 	failureCount int32
 	lastFailure  time.Time
 }
@@ -40,25 +41,50 @@ func newFeedPoller(
 	return &feedPoller{
 		feedConfig: feedConfig,
 		ha:         ha,
-		log:       log,
-		pollFunc:  pollFunc,
+		log:        log,
+		pollFunc:   pollFunc,
 	}
 }
 
 // start begins polling the feed at the configured interval with resilience features
 func (p *feedPoller) start(ctx context.Context) {
+	// Create a context for this poller instance
+	pollerCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Ensure we recover from any panics in the poller goroutine
 	defer func() {
 		if r := recover(); r != nil {
 			p.log.Error.Printf("Recovered from panic in feed %s: %v", p.feedConfig.Id, r)
-			// Restart the poller after a delay
-			time.AfterFunc(30*time.Second, func() {
-				p.start(ctx)
-			})
+			
+			// Check if the parent context is still valid
+			select {
+			case <-ctx.Done():
+				p.log.Info.Printf("Parent context cancelled, not restarting feed %s", p.feedConfig.Id)
+				return
+			default:
+				// Restart the poller after a delay using a new goroutine
+				go func() {
+					timer := time.NewTimer(30 * time.Second)
+					defer timer.Stop()
+
+					select {
+					case <-timer.C:
+						p.start(ctx)
+					case <-ctx.Done():
+						// Context was canceled, don't restart
+					}
+				}()
+			}
 		}
 	}()
 
-	interval, _ := time.ParseDuration(p.feedConfig.PollInterval)
+	interval, err := time.ParseDuration(p.feedConfig.PollInterval)
+	if err != nil {
+		p.log.Error.Printf("Invalid poll interval '%s' for feed %s, using default: %v", 
+			p.feedConfig.PollInterval, p.feedConfig.Id, err)
+		interval = time.Minute // Fallback to 1 minute
+	}
 	backoff := initialBackoff
 
 	// Initial poll
@@ -108,13 +134,17 @@ func (p *feedPoller) pollWithRecovery(ctx context.Context) error {
 
 // isCircuitOpen checks if the circuit breaker should be open
 func (p *feedPoller) isCircuitOpen() bool {
-	if atomic.LoadInt32(&p.failureCount) < maxFailures {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.failureCount < maxFailures {
 		return false
 	}
 
 	// After resetTimeout, try again
 	if time.Since(p.lastFailure) > resetTimeout {
-		atomic.StoreInt32(&p.failureCount, 0)
+		p.failureCount = 0
+		p.log.Info.Printf("Circuit breaker reset for feed %s", p.feedConfig.Id)
 		return false
 	}
 
@@ -123,13 +153,27 @@ func (p *feedPoller) isCircuitOpen() bool {
 
 // recordFailure increments the failure count and updates the last failure time
 func (p *feedPoller) recordFailure() {
-	atomic.AddInt32(&p.failureCount, 1)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.failureCount++
 	p.lastFailure = time.Now()
+
+	if p.failureCount == maxFailures {
+		p.log.Error.Printf("Circuit breaker opened for feed %s after %d failures", 
+			p.feedConfig.Id, maxFailures)
+	}
 }
 
 // resetCircuit resets the circuit breaker
 func (p *feedPoller) resetCircuit() {
-	atomic.StoreInt32(&p.failureCount, 0)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.failureCount > 0 {
+		p.log.Info.Printf("Circuit breaker closed for feed %s", p.feedConfig.Id)
+		p.failureCount = 0
+	}
 }
 
 // pollOnce performs a single poll of the feed with context timeout
