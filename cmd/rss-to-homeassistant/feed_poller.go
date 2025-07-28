@@ -52,7 +52,7 @@ func (p *feedPoller) start(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			p.log.Error.Printf("Recovered from panic in feed %s: %v", p.feedConfig.Id, r)
-			
+
 			// Check if the parent context is still valid
 			select {
 			case <-ctx.Done():
@@ -77,7 +77,7 @@ func (p *feedPoller) start(ctx context.Context) {
 
 	interval, err := time.ParseDuration(p.feedConfig.PollInterval)
 	if err != nil {
-		p.log.Error.Printf("Invalid poll interval '%s' for feed %s, using default: %v", 
+		p.log.Error.Printf("Invalid poll interval '%s' for feed %s, using default: %v",
 			p.feedConfig.PollInterval, p.feedConfig.Id, err)
 		interval = time.Minute // Fallback to 1 minute
 	}
@@ -156,7 +156,7 @@ func (p *feedPoller) recordFailure() {
 	p.lastFailure = time.Now()
 
 	if p.failureCount == maxFailures {
-		p.log.Error.Printf("Circuit breaker opened for feed %s after %d failures", 
+		p.log.Error.Printf("Circuit breaker opened for feed %s after %d failures",
 			p.feedConfig.Id, maxFailures)
 	}
 }
