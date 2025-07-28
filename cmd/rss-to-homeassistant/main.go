@@ -100,51 +100,38 @@ func logic(ctx context.Context, logger *log.Logger) error {
 
 	tasks := taskrunner.New(ctx, logger)
 	tasks.Start("homeassistant-mqtt", haMqttTask)
-	tasks.Start("main", func(ctx context.Context) error {
-		pollingTasks := []func(context.Context) error{}
-
-		entities := []*homeassistant.Entity{}
-
+	tasks.Start("feed-pollers", func(ctx context.Context) error {
+		// Create entities and start pollers for each feed
 		for _, feed := range conf.RSSFeeds {
-			feedSensor, feedPollerTask := makeRssFeedSensor(feed, ha, logl)
+			feed := feed // Create a new variable for the goroutine
+			feedSensor, pollFunc := makeRssFeedSensor(feed, ha, logl)
 
-			entities = append(entities, feedSensor)
-			pollingTasks = append(pollingTasks, feedPollerTask)
-		}
-
-		// tell Home Assistant about our RSS feeds
-		if err := ha.AutodiscoverEntities(entities...); err != nil {
-			return err
-		}
-
-		runPollingTasks := func() {
-			_ = launchAndWaitMany(ctx, func(err error) {
-				logl.Error.Println(err)
-			}, pollingTasks...)
-		}
-
-		// so we don't have to wait the *pollInterval* for the initial sync
-		runPollingTasks()
-
-		pollInterval := time.NewTicker(1 * time.Minute)
-
-		for {
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-pollInterval.C:
-				runPollingTasks()
+			// Tell Home Assistant about this feed
+			if err := ha.AutodiscoverEntities(feedSensor); err != nil {
+				logl.Error.Printf("Failed to autodiscover feed %s: %v", feed.Id, err)
+				continue
 			}
+
+			// Create and start the poller for this feed
+			poller := newFeedPoller(feed, ha, logl, pollFunc)
+			go poller.start(ctx)
+
+			logl.Info.Printf("Started polling feed %s with interval %s", feed.Id, feed.PollInterval)
 		}
+
+		// Block until context is cancelled
+		<-ctx.Done()
+		return nil
 	})
 
 	return tasks.Wait()
 }
 
 type configRSSFeed struct {
-	Id       string        `json:"id"`
-	URL      string        `json:"url"`
-	Settings *feedSettings `json:"settings"`
+	Id           string        `json:"id"`
+	URL          string        `json:"url"`
+	PollInterval string        `json:"poll_interval,omitempty"`
+	Settings     *feedSettings `json:"settings,omitempty"`
 }
 
 type feedSettings struct {
@@ -156,18 +143,47 @@ type config struct {
 	RSSFeeds []configRSSFeed          `json:"rss_feeds"`
 }
 
+const (
+	defaultPollInterval = "1m"
+	minPollInterval    = 10 * time.Second
+	maxPollInterval    = 24 * time.Hour
+)
+
 func readConfigurationFile() (*config, error) {
 	conf := &config{}
 	if err := jsonfile.ReadDisallowUnknownFields("config.json", &conf); err != nil {
 		return nil, err
 	}
 
-	for _, rssFeed := range conf.RSSFeeds {
+	for i := range conf.RSSFeeds {
+		rssFeed := &conf.RSSFeeds[i]
+
 		// Home Assistant tolerates this but will silently translate to '_'.
 		// but we want to be explicit to avoid confusion.
 		if strings.Contains(rssFeed.Id, "-") {
 			return nil, errors.New("RSS feed ID cannot contain '-'")
 		}
+
+		// Set default poll interval if not specified
+		if rssFeed.PollInterval == "" {
+			rssFeed.PollInterval = defaultPollInterval
+		}
+
+		// Validate poll interval
+		duration, err := time.ParseDuration(rssFeed.PollInterval)
+		if err != nil {
+			return nil, fmt.Errorf("invalid poll_interval '%s' for feed '%s': %v", rssFeed.PollInterval, rssFeed.Id, err)
+		}
+
+		if duration < minPollInterval {
+			return nil, fmt.Errorf("poll_interval for feed '%s' cannot be less than %v", rssFeed.Id, minPollInterval)
+		}
+
+		if duration > maxPollInterval {
+			return nil, fmt.Errorf("poll_interval for feed '%s' cannot be greater than %v", rssFeed.Id, maxPollInterval)
+		}
+
+		rssFeed.PollInterval = duration.String() // Normalize the duration string
 	}
 
 	return conf, nil

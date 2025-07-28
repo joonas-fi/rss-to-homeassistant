@@ -15,8 +15,9 @@ import (
 
 var topicPrefix = homeassistant.NewTopicPrefix("rss-to-homeassistant")
 
-// makes sensor entity for advertising via autodiscovery, and a re-runnable task that checks for
-// changes in the feed, and if it has it publishes the changed markdown to Home Assistant
+// makeRssFeedSensor creates a sensor entity for Home Assistant and returns a polling function
+// that checks for changes in the feed and updates Home Assistant when changes are detected.
+// The polling function is designed to be called by the feedPoller at the configured interval.
 func makeRssFeedSensor(
 	feedConfig configRSSFeed,
 	ha *homeassistant.MqttClient,
