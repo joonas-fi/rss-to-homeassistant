@@ -33,7 +33,35 @@ You need to create `config.json`:
 	"rss_feeds": [
 		{
 			"id": "skrolli",
-			"url": "https://skrolli.fi/feed/"
+			"url": "https://skrolli.fi/feed/",
+			"poll_interval": "15m"
+		}
+	]
+}
+```
+
+### Polling Interval Configuration
+
+You can configure the polling interval for each RSS feed individually using the `poll_interval` parameter. The interval should be specified as a string in Go's duration format (e.g., "30s", "5m", "1h").
+
+- **Default**: If not specified, the default polling interval is 1 minute ("1m")
+- **Minimum**: 10 seconds ("10s")
+- **Maximum**: 24 hours ("24h")
+
+Example configuration with different intervals:
+
+```json
+{
+	"rss_feeds": [
+		{
+			"id": "news",
+			"url": "https://example.com/feed.xml",
+			"poll_interval": "5m"  // Check every 5 minutes
+		},
+		{
+			"id": "blog",
+			"url": "https://blog.example.com/rss",
+			"poll_interval": "30m"  // Check every 30 minutes
 		}
 	]
 }
@@ -110,5 +138,5 @@ Have fun! Enjoy life.
 TODO
 ----
 
-- Consider polling interval, 1 minute might be too often
 - Implement HTTP caching to be nice to RSS publishers
+- Add more configuration options for feed display
