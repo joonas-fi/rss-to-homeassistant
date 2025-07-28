@@ -21,9 +21,9 @@ const (
 // feedPoller manages the polling of a single RSS feed with resilience features
 type feedPoller struct {
 	feedConfig configRSSFeed
-	ha        *homeassistant.MqttClient
-	log      *logex.Leveled
-	pollFunc func(context.Context) error
+	ha         *homeassistant.MqttClient
+	log        *logex.Leveled
+	pollFunc   func(context.Context) error
 
 	// Circuit breaker state
 	failureCount int32
