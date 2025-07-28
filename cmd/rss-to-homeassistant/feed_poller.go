@@ -21,10 +21,10 @@ const (
 // feedPoller manages the polling of a single RSS feed with resilience features
 type feedPoller struct {
 	feedConfig configRSSFeed
-	ha         *homeassistant.MqttClient
-	log       *logex.Leveled
-	pollFunc  func(context.Context) error
-	
+	ha        *homeassistant.MqttClient
+	log      *logex.Leveled
+	pollFunc func(context.Context) error
+
 	// Circuit breaker state
 	failureCount int32
 	lastFailure  time.Time
@@ -62,7 +62,9 @@ func (p *feedPoller) start(ctx context.Context) {
 	backoff := initialBackoff
 
 	// Initial poll
-	p.pollWithRecovery(ctx)
+	if err := p.pollWithRecovery(ctx); err != nil {
+		p.recordFailure()
+	}
 
 	for {
 		select {
@@ -131,10 +133,5 @@ func (p *feedPoller) resetCircuit() {
 }
 
 // pollOnce performs a single poll of the feed with context timeout
-func (p *feedPoller) pollOnce(ctx context.Context) error {
-	// Add a timeout to the poll operation
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	return p.pollFunc(ctx)
-}
+// This is kept for future use if direct polling is needed
+var _ = (*feedPoller).pollOnce

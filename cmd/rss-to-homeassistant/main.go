@@ -145,8 +145,8 @@ type config struct {
 
 const (
 	defaultPollInterval = "1m"
-	minPollInterval    = 10 * time.Second
-	maxPollInterval    = 24 * time.Hour
+	minPollInterval     = 10 * time.Second
+	maxPollInterval     = 24 * time.Hour
 )
 
 func readConfigurationFile() (*config, error) {
