@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/function61/gokit/log/logex"
 	"github.com/function61/gokit/net/http/ezhttp"
@@ -15,8 +18,9 @@ import (
 
 var topicPrefix = homeassistant.NewTopicPrefix("rss-to-homeassistant")
 
-// makes sensor entity for advertising via autodiscovery, and a re-runnable task that checks for
-// changes in the feed, and if it has it publishes the changed markdown to Home Assistant
+// makeRssFeedSensor creates a sensor entity for Home Assistant and returns a polling function
+// that checks for changes in the feed and updates Home Assistant when changes are detected.
+// The polling function is designed to be called by the feedPoller at the configured interval.
 func makeRssFeedSensor(
 	feedConfig configRSSFeed,
 	ha *homeassistant.MqttClient,
@@ -95,6 +99,28 @@ func fetchRSSFeed(ctx context.Context, feedUrl string) (*gofeed.Feed, error) {
 }
 
 func fetchRSSFeedToMarkdown(ctx context.Context, feedConfig configRSSFeed) (*gofeed.Feed, string, error) {
+	format := feedConfig.Format
+	if format == "" {
+		format = "auto"
+	}
+
+	// Auto-detection logic
+	if format == "auto" {
+		if strings.Contains(feedConfig.URL, "nutrislice.com") {
+			format = "json"
+		} else {
+			// For now, assume RSS if not Nutrislice, or we can peek at headers if needed.
+			// But the spec says "or Nutrislice.com in URL".
+			// Let's refine this to check Content-Type if we wanted to be more robust.
+			format = "rss"
+		}
+	}
+
+	if format == "json" {
+		return fetchNutrisliceToMarkdown(ctx, feedConfig)
+	}
+
+	// Legacy RSS path
 	feed, err := fetchRSSFeed(ctx, feedConfig.URL)
 	if err != nil {
 		return nil, "", err
@@ -109,4 +135,99 @@ func fetchRSSFeedToMarkdown(ctx context.Context, feedConfig configRSSFeed) (*gof
 	}()
 
 	return feed, feedToMarkdownList(feed, itemDisplayLimit, 100), nil
+}
+
+type NutrisliceResponse struct {
+	Days []NutrisliceDay `json:"days"`
+}
+
+type NutrisliceDay struct {
+	Date      string               `json:"date"`
+	MenuItems []NutrisliceMenuItem `json:"menu_items"`
+}
+
+type NutrisliceMenuItem struct {
+	Text string          `json:"text"`
+	Food *NutrisliceFood `json:"food"`
+}
+
+type NutrisliceFood struct {
+	Name string `json:"name"`
+}
+
+var nutrisliceDateRegexp = regexp.MustCompile(`\d{4}/\d{2}/\d{2}`)
+
+func fetchNutrisliceToMarkdown(ctx context.Context, feedConfig configRSSFeed) (*gofeed.Feed, string, error) {
+	now := time.Now()
+	targetDate := now
+	if now.Hour() >= 14 { // Past 2pm, use tomorrow's date
+		targetDate = now.AddDate(0, 0, 1)
+	}
+
+	url := feedConfig.URL
+	// Automatically replace date in URL if it matches Nutrislice pattern
+	url = nutrisliceDateRegexp.ReplaceAllString(url, targetDate.Format("2006/01/02"))
+
+	res, err := ezhttp.Get(ctx, url)
+	if err != nil {
+		return nil, "", fmt.Errorf("Menu Unavailable: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		return nil, "", fmt.Errorf("Menu Unavailable: HTTP %d", res.StatusCode)
+	}
+
+	contentType := res.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		return nil, "", fmt.Errorf("Menu Unavailable: Expected JSON but got %s", contentType)
+	}
+
+	var nutrislice NutrisliceResponse
+	if err := json.NewDecoder(res.Body).Decode(&nutrislice); err != nil {
+		return nil, "", fmt.Errorf("Menu Unavailable: JSON decode error: %w", err)
+	}
+
+	return &gofeed.Feed{Title: "Menu"}, nutrisliceToMarkdown(nutrislice, now), nil
+}
+
+func nutrisliceToMarkdown(nutrislice NutrisliceResponse, now time.Time) string {
+	targetDate := now
+	if now.Hour() >= 14 { // Past 2pm, use tomorrow's date
+		targetDate = now.AddDate(0, 0, 1)
+	}
+
+	targetDateStr := targetDate.Format("2006-01-02")
+	var targetMenuItems []NutrisliceMenuItem
+
+	for _, day := range nutrislice.Days {
+		if day.Date == targetDateStr {
+			targetMenuItems = day.MenuItems
+			break
+		}
+	}
+
+	if len(targetMenuItems) == 0 {
+		return "No Menu Today"
+	}
+
+	lines := []string{}
+	for _, item := range targetMenuItems {
+		name := ""
+		if item.Food != nil && item.Food.Name != "" {
+			name = item.Food.Name
+		} else if item.Text != "" {
+			name = item.Text
+		}
+
+		if name != "" {
+			lines = append(lines, "- "+name)
+		}
+	}
+
+	if len(lines) == 0 {
+		return "No Menu Today"
+	}
+
+	return strings.Join(lines, "\n")
 }

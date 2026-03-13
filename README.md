@@ -3,7 +3,7 @@
 ![Build status](https://github.com/joonas-fi/rss-to-homeassistant/workflows/Build/badge.svg)
 [![Download](https://img.shields.io/github/downloads/joonas-fi/rss-to-homeassistant/total.svg?style=for-the-badge)](https://github.com/joonas-fi/rss-to-homeassistant/releases)
 
-Pushes RSS feeds into Home Assistant as Markdown, so they can be displayed natively.
+Pushes RSS feeds or JSON-based menus (like Nutrislice) into Home Assistant as Markdown, so they can be displayed natively.
 
 For more background, see my [blog post](https://joonas.fi/2020/08/displaying-rss-feed-with-home-assistant/).
 
@@ -33,13 +33,73 @@ You need to create `config.json`:
 	"rss_feeds": [
 		{
 			"id": "skrolli",
-			"url": "https://skrolli.fi/feed/"
+			"url": "https://skrolli.fi/feed/",
+			"poll_interval": "15m",
+			"format": "rss"
+		},
+		{
+			"id": "school_menu",
+			"url": "https://district.api.nutrislice.com/menu/api/...",
+			"format": "json"
+		}
+	]
+}
+```
+
+### Polling Interval Configuration
+
+You can configure the polling interval for each RSS feed individually using the `poll_interval` parameter. The interval should be specified as a string in Go's duration format (e.g., "30s", "5m", "1h").
+
+- **Default**: If not specified, the default polling interval is 1 minute ("1m")
+- **Minimum**: 10 seconds ("10s")
+- **Maximum**: 24 hours ("24h")
+
+Example configuration with different intervals:
+
+```json
+{
+	"rss_feeds": [
+		{
+			"id": "news",
+			"url": "https://example.com/feed.xml",
+			"poll_interval": "5m"  // Check every 5 minutes
+		},
+		{
+			"id": "blog",
+			"url": "https://blog.example.com/rss",
+			"poll_interval": "30m"  // Check every 30 minutes
 		}
 	]
 }
 ```
 
 If you don't use MQTT username/password, you can remove the whole `"credentials": {...}` section.
+
+### Hybrid RSS/JSON Support
+
+This software is "format-agnostic" and can automatically detect the data type based on the URL or response headers.
+
+- **RSS**: Standard RSS feeds (XML).
+- **JSON (Nutrislice)**: Supports Nutrislice API endpoints for school menus. The system automatically extracts today's menu items and handles date-based URLs dynamically.
+
+#### Manual Format Override
+
+You can manually specify the format in `config.json` using the `format` field:
+- `"auto"` (Default): Auto-detect based on URL/Headers.
+- `"rss"`: Force legacy RSS parsing.
+- `"json"`: Force Nutrislice JSON parsing.
+
+```console
+DATA_FORMAT=json ./rss-to-homeassistant
+```
+
+#### Automatic Date Handling
+
+For Nutrislice URLs, the program automatically manages the date to ensure the menu is always current:
+- **Dynamic URL Injection**: If your URL contains a date (e.g., `.../2026/02/23/...`), the program will automatically replace it with the correct target date every time it polls.
+- **Smart Date Selection**: If the current local time is **past 2:00 PM**, the system automatically fetches and displays **tomorrow's** menu, so you always see the most relevant upcoming meal.
+
+This means you can paste any valid Nutrislice API URL into the config once, and it will work indefinitely without manual updates.
 
 
 How to use
@@ -110,5 +170,5 @@ Have fun! Enjoy life.
 TODO
 ----
 
-- Consider polling interval, 1 minute might be too often
 - Implement HTTP caching to be nice to RSS publishers
+- Add more configuration options for feed display
